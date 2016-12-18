@@ -1,0 +1,154 @@
+Data Source:
+
+The training data for this project are available here:
+[Training Set] https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+[Test Set]  https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+Environment (library) setup:
+
+
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(randomForest)
+library(corrplot)
+Set.seed(301)
+
+Loading the data
+
+>pml_train <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.string = c("NA", "", "DIV/0!"))
+>pml_testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.string = c("NA", "", "DIV/0!"))
+
+>dim(pml_train)
+[1] 19622 160
+
+>dim(pml_testing)
+[1] 20 160
+
+Cleaning the data
+
+Working on the training data.
+# Removing variables with nearly zero variance
+
+NZV <- nearZeroVar(pml_train)
+pml_train1 <- pml_train[, -NZV]
+dim(pml_train1) 
+[1] 19622   117
+
+# Removing variables that are almost always NA > 95% of instance.
+
+data.NA <- sapply(pml_train1, function(x) mean(is.na(x))) >0.95
+pml_train2 <- pml_train1[, data.NA==F]
+
+# Removing no-numerical variables - first 5 columns.
+
+trainSet <- pml_train2[, -(1:6)]
+
+
+
+Splitting the data set
+
+Slipping the data in training data set (70%) and validation set (30%). The training data set will be then used for cross-validation. 
+
+Set.seed(301)
+
+InTrain <- createDataPartition(y=trainSet$Class, p = 0.7, list = F)
+
+train.Set <- trainSet[inTrain, ]
+
+test.Set <- trainSet[-inTrain, ]
+
+
+
+Get Variables predictors
+
+ModelVars <- name(trainSet)
+ModelVars1 <- modelVars[-grep("classe", modelVars)
+ModelVars1
+
+ [1] "num_window"           "roll_belt"            "pitch_belt"           "yaw_belt"             "total_accel_belt"    
+ [6] "gyros_belt_x"         "gyros_belt_y"         "gyros_belt_z"         "accel_belt_x"         "accel_belt_y"        
+[11] "accel_belt_z"         "magnet_belt_x"        "magnet_belt_y"        "magnet_belt_z"        "roll_arm"            
+[16] "pitch_arm"            "yaw_arm"              "total_accel_arm"      "gyros_arm_x"          "gyros_arm_y"         
+[21] "gyros_arm_z"          "accel_arm_x"          "accel_arm_y"          "accel_arm_z"          "magnet_arm_x"        
+[26] "magnet_arm_y"         "magnet_arm_z"         "roll_dumbbell"        "pitch_dumbbell"       "yaw_dumbbell"        
+[31] "total_accel_dumbbell" "gyros_dumbbell_x"     "gyros_dumbbell_y"     "gyros_dumbbell_z"     "accel_dumbbell_x"    
+[36] "accel_dumbbell_y"     "accel_dumbbell_z"     "magnet_dumbbell_x"    "magnet_dumbbell_y"    "magnet_dumbbell_z"   
+[41] "roll_forearm"         "pitch_forearm"        "yaw_forearm"          "total_accel_forearm"  "gyros_forearm_x"     
+[46] "gyros_forearm_y"      "gyros_forearm_z"      "accel_forearm_x"      "accel_forearm_y"      "accel_forearm_z"     
+[51] "magnet_forearm_x"     "magnet_forearm_y"     "magnet_forearm_z"  
+
+ 
+Data Modeling
+
+# Build a random forest model 
+model <- train(tran.Set$classe ~., method="rf", preProcess=c("center", "scale"), trControl=trainControl(method="cv", number = 4), data=train.Set)
+Print(model)
+
+## Random Forest 
+## 
+## 15699 samples
+##    52 predictor
+##     5 classes: 'A', 'B', 'C', 'D', 'E' 
+## 
+## Pre-processing: centered (52), scaled (52) 
+## Resampling: Cross-Validated (4 fold) 
+## Summary of sample sizes: 11774, 11774, 11774, 11775 
+## Resampling results across tuning parameters:
+## 
+##   mtry  Accuracy   Kappa      Accuracy SD  Kappa SD   
+##    2    0.9919742  0.9898467  0.001695710  0.002145392
+##   27    0.9909551  0.9885581  0.003569432  0.004515449
+##   52    0.9842030  0.9800155  0.001775883  0.002245550
+## 
+## Accuracy was used to select the optimal model using  the largest value.
+## The final value used for the model was mtry = 2.
+
+
+Assessing the model
+
+In order to assess the model and estimate the out-of-sample error, the model is run against train.Set:
+
+predictions <- predict(model, newdataset = test.Set)
+Print(confusionMatrix(predictions, test.Set$classe), digits = 4)
+
+
+## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1116    6    0    0    0
+##          B    0  751    5    0    0
+##          C    0    2  678   15    0
+##          D    0    0    1  628    1
+##          E    0    0    0    0  720
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9924          
+##                  95% CI : (0.9891, 0.9948)
+##     No Information Rate : 0.2845          
+##     P-Value [Acc > NIR] : < 2.2e-16       
+##                                           
+##                   Kappa : 0.9903          
+##  Mcnemar's Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            1.0000   0.9895   0.9912   0.9767   0.9986
+## Specificity            0.9979   0.9984   0.9948   0.9994   1.0000
+## Pos Pred Value         0.9947   0.9934   0.9755   0.9968   1.0000
+## Neg Pred Value         1.0000   0.9975   0.9981   0.9954   0.9997
+## Prevalence             0.2845   0.1935   0.1744   0.1639   0.1838
+## Detection Rate         0.2845   0.1914   0.1728   0.1601   0.1835
+## Detection Prevalence   0.2860   0.1927   0.1772   0.1606   0.1835
+## Balanced Accuracy      0.9989   0.9939   0.9930   0.9880   0.9993
+ 
+
+
+Apply the model on 20 test cases:
+
+print(predict(model, newdata=test)
+
